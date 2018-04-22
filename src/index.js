@@ -1,59 +1,77 @@
-import morgan from "morgan";
-import express from "express";
-import multer from "multer";
-import v4 from "uuid/v4";
-import mime from "mime";
+import morgan from 'morgan'
+import express from 'express'
+import multer from 'multer'
+import fs from 'fs'
+import v4 from 'uuid/v4'
+import mime from 'mime'
+import cloudinary from 'cloudinary'
+import dotenv from 'dotenv'
 
-const storage = multer.diskStorage({
-  destination: "./files",
-  filename(req, file, cb) {
-    cb(null, `${v4()}.${mime.getExtension(file.mimetype)}`);
-  }
-});
+const result = dotenv.config()
 
-const upload = multer({
-  storage,
-  limits: {
-    files: 1,
-    fileSize: 1 * 1024 * 1024 // 1mb, in bytes
-  }
-}).single("file");
+if (result.error) {
+	throw result.error
+}
 
-const app = express();
-app.use(morgan("dev"));
+const PORT = process.env.PORT || 3000
 
-app.use(function(req, res, next) {
-  res.header("Access-Control-Allow-Origin", "*");
-  res.header(
-    "Access-Control-Allow-Headers",
-    "Origin, X-Requested-With, Content-Type, Accept"
-  );
-  next();
-});
+cloudinary.config({
+	cloud_name: process.env.CLOUD_NAME,
+	api_key: process.env.API_KEY,
+	api_secret: process.env.API_SECRET,
+})
 
-app.get("/", function(req, res) {
-  res.json({
-    heartbeat: true
-  });
-});
+const storage = multer.memoryStorage()
+const upload = multer({ storage })
 
-app.post("/upload", function(req, res) {
-  upload(req, res, function(err) {
-    if (err) {
-      res.statusCode = 400;
-      return res.json({
-        error: err
-      });
-    }
+const app = express()
+app.use(morgan('dev'))
 
-    const file = req.file;
-    const meta = req.body;
-    res.json({
-      filename: file.filename
-    });
-  });
-});
+app.use((req, res, next) => {
+	res.header('Access-Control-Allow-Origin', '*')
+	res.header(
+		'Access-Control-Allow-Headers',
+		'Origin, X-Requested-With, Content-Type, Accept',
+	)
+	next()
+})
 
-app.listen(3010, function() {
-  console.log("App started on port 3010");
-});
+app.get('/', (req, res) => {
+	res.json({
+		heartbeat: true,
+	})
+})
+
+app.post('/upload', upload.single('file'), (req, res) => {
+	var stream = cloudinary.v2.uploader
+		.upload_stream((error, result) => {
+			if (error) {
+				res.statusCode = 400
+				return res.json({
+					error,
+				})
+			}
+			res.json({
+				result,
+			})
+		})
+		.end(req.file.buffer)
+})
+
+app.get('/file/:id', (req, res) => {
+	cloudinary.v2.api.resource(req.params.id, (error, result) => {
+		if (error) {
+			res.statusCode = 400
+			return res.json({
+				error,
+			})
+		}
+		res.json({
+			result,
+		})
+	})
+})
+
+app.listen(PORT, () => {
+	console.log(`Server is listening on port ${PORT}`)
+})
