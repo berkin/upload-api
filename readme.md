@@ -1,15 +1,13 @@
 # Upload Api
 
-
-
-'''sh
+```sh
 npm install
 npm start
-'''
+```
 
 to run locally add an .env file. add your cloudinary details.
-'''sh
+```sh
 CLOUD_NAME=
 API_KEY=
 API_SECRET=
-'''
+```
